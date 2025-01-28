@@ -1,4 +1,4 @@
-function main() {
+export function main() {
   //Глобальные переменные
   const lang = document.documentElement.lang;
   const body = document.querySelector('body');
@@ -525,6 +525,6 @@ function main() {
   }
   window.addEventListener('beforeunload', () => {
     saveDataToLocal();
-  });
+  }); 
 }
 
