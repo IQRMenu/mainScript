@@ -344,14 +344,21 @@ export function main(fetchDishesList, words, globalData) {
 
     if (tableNumber == '') {
       tableNumber = prompt(`${words[lang].textAskTableNumber}`);
-      if (tableNumber == 'null' || isNaN(tableNumber)) {
-        tableNumber = "";
+      if (tableNumber == 'null' || isNaN(tableNumber) || tableNumber == '' || tableNumber === null) {
+        if (tableNumber === null){
+          tableNumber = "";
+          sendOrderButton.disabled = false;
+          return
+        }else{
+          tableNumber = "";
         sendOrderButton.disabled = false;
         alert(`${words[lang].textAskTableNumber}`)
         sendOrder();
         return
+        }      
       }
-    }
+    }  
+
     if (orderId == '') {
       orderId = createOrderId();
     }
