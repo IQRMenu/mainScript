@@ -53,6 +53,7 @@ export function main(fetchDishesList, words, globalData) {
   //Проверка версии
   if (globalData.version == 'basik') {
     sendOrderButton.disabled = true;
+    body.classList.add('event_none');
     sendOrderButton.classList.add('display_none');
   } else {
     sendOrderButton.disabled = false;
