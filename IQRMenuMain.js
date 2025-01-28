@@ -1,4 +1,4 @@
-export function main() {
+export function main(fetchDishesList, words, globalData) {
   //Глобальные переменные
   const lang = document.documentElement.lang;
   const body = document.querySelector('body');
