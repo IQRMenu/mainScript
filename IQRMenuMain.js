@@ -9,6 +9,136 @@ export function main(fetchDishesList, words, globalData) {
   const basketButtonClouse = document.querySelector('.basket-clouse');
   const basketBox = document.querySelector('.basket-box');
   const orderBoxDiv = document.querySelector('.order-box');
+  const payOrderButton = document.querySelector('#payOrderButton');
+  const wrapperDiv = document.querySelector('.wrapper');
+  const dialogBoxDiv = document.querySelector('.dialogBox');
+
+  // Функция для нажатия на кнорку оплатить
+  payOrderButton.addEventListener('click', () => {
+    dialogBoxAppears('selectPaymentMethod')
+  })
+
+  // Функция для формирования диологового окна
+  function dialogBoxAppears(type, text = '') {
+    dialogBoxDiv.innerHTML = '';
+    switch (type) {
+      case 'selectPaymentMethod':
+        dialogBoxDiv.innerHTML = `
+        <p>${words[lang].selectPaymentMethod}</p>
+        <div class="dialogBox__buttons">
+          <button id="cashButton">${words[lang].cash}</button>
+          <button id="bankCardButton">${words[lang].bankCard}</button>
+          <button class='cancel-button' id="cancelButton">${words[lang].cancelButton}</button>
+        </div>
+      `;
+        wrapperDiv.classList.add('wrapper_active');
+        dialogBoxDiv.querySelector('#cashButton').addEventListener('click', async () => {
+          const trySend = await sendMessageForPay('cash');
+          if (trySend === 'ok') {
+            dialogBoxAppears('info', `${words[lang].waiterWillCome}`)
+          } else {
+            dialogBoxAppears('info', `${words[lang].errorInviteWaiter}`);
+          }
+        });
+        dialogBoxDiv.querySelector('#bankCardButton').addEventListener('click', async () => {
+          const trySend = await sendMessageForPay('bankCard');
+          if (trySend === 'ok') {
+            dialogBoxAppears('info', `${words[lang].waiterWillCome}`)
+          } else {
+            dialogBoxAppears('info', `${words[lang].errorInviteWaiter}`);
+          }
+        });
+
+        dialogBoxDiv.querySelector('#cancelButton').addEventListener('click', () => {
+          wrapperDiv.classList.remove('wrapper_active');
+        });
+        break;
+
+      case 'info':
+        dialogBoxDiv.innerHTML = `
+        <p>${text}</p>
+        <div class="dialogBox__buttons">
+          <button class='cancel-button' id="cancelButton">Ок</button>
+        </div>
+      `;
+        wrapperDiv.classList.add('wrapper_active');
+        dialogBoxDiv.querySelector('#cancelButton').addEventListener('click', () => {
+          wrapperDiv.classList.remove('wrapper_active');
+        });
+        break;
+
+      case 'inpitTableNumber':
+        dialogBoxDiv.innerHTML = `
+        <p>${words[lang].textAskTableNumber}</p>
+        <input type='number' placeholder="№">
+        <div class="dialogBox__buttons">
+          <button id="ok">Ок</button>
+          <button class='cancel-button' id="cancelButton">${words[lang].cancelButton}</button>
+        </div>
+      `;
+        wrapperDiv.classList.add('wrapper_active');
+        dialogBoxDiv.querySelector('#cancelButton').addEventListener('click', () => {
+          wrapperDiv.classList.remove('wrapper_active');
+        });
+        dialogBoxDiv.querySelector('#ok').addEventListener('click', () => {
+          const inputText = dialogBoxDiv.querySelector('input').value;
+          if (inputText == 'null' || isNaN(inputText) || inputText == '' || inputText === null) {
+            dialogBoxDiv.querySelector('p').innerText = `${words[lang].enterCorrectly}`;
+          } else {
+            tableNumber = parseInt(inputText);
+            sendOrder();
+          };
+        });
+        break;
+
+      default:
+        break;
+    }
+  }
+
+  // Функция для отправки заявки на орлату
+  async function sendMessageForPay(type) {
+    const paymentMethod = type === 'cash' ? `${words[globalData.mainLang].cash}` : `${words[globalData.mainLang].bankCard}`;
+    const apiUrl = `https://api.telegram.org/bot${globalData.botToken}/sendMessage`;
+    let orderListText = '';
+    let portionNumberMessage = 0;
+    let totalCostMessage = 0;
+
+    ordersList.forEach(item => {
+      portionNumberMessage += 1;
+      orderListText += `\n${portionNumberMessage}. ${item.dishName} - ${item.portionName}x${item.portionNumber} - ${item.totalCost}${globalData.currencySymbol}\n${item.dishNameMainLang}\n`;
+      totalCostMessage += item.totalCost;
+    });
+    const variables = {
+      orderId: orderId,
+      tableNumber: tableNumber,
+      paymentMethod: paymentMethod,
+      orderListText: orderListText,
+      totalCostMessage: totalCostMessage,
+      currencySymbol: globalData.currencySymbol,
+    };
+    let fullText = Object.keys(variables).reduce((text, key) => {
+      return text.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), variables[key]);
+    }, words[globalData.mainLang].textMessage);
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chat_id: globalData.chatId,
+          text: fullText,
+        }),
+      });
+
+      const data = await response.json();
+      return data.ok ? 'ok' : 'error';
+    } catch (error) {
+      return 'error';
+    }
+  }
+
 
   // Функция для заполнения формы
   function configureForm() {
@@ -28,8 +158,6 @@ export function main(fetchDishesList, words, globalData) {
       }
     }
   }
-
-  // Вызов функции после загрузки страницы
 
 
   // открытие и закрытие корзины
@@ -101,11 +229,11 @@ export function main(fetchDishesList, words, globalData) {
       const month = String(now.getMonth() + 1).padStart(2, '0'); // Месяц
       const year = now.getFullYear(); // Год
       const date = `${day}.${month}.${year}`;
-      const minutes = String(now.getMinutes()).padStart(2, '0'); // Минуты
 
       if (localStorage.getItem('userData')) {
-
         if (JSON.parse(localStorage.getItem('userData')).datelastVisit != date) {
+          console.log(date);
+
           localStorage.removeItem('userData');
           if (localStorage.getItem('table') != 'null') {
             tableNumber = localStorage.getItem('table');
@@ -114,6 +242,7 @@ export function main(fetchDishesList, words, globalData) {
         } else {
           userSavedData = JSON.parse(localStorage.getItem('userData'));
           orderId = userSavedData.userOrderID;
+          tableNumber = userSavedData.userTableNumber;
           yourOrderButton.innerHTML = `Ваш закза<br>№ ${orderId}`;
           ordersList = userSavedData.userOrderList;
           if (ordersList.length > 0) {
@@ -128,7 +257,6 @@ export function main(fetchDishesList, words, globalData) {
             sendOrderButton.disabled = false;
             sendOrderButton.classList.remove('_display_none');
           }
-          tableNumber = userSavedData.userTableNumber;
         }
       }
       renderDishesCategoryList(storeData);
@@ -271,17 +399,17 @@ export function main(fetchDishesList, words, globalData) {
       if (parseInt(portionNumberSpan.textContent) > 0) {
         portionNumberSpan.textContent = parseInt(portionNumberSpan.textContent) - 1;
         if (parseInt(portionNumberSpan.textContent) === 0) {
-          if (confirm(`${words[lang].deletePortionMessage}`)) {
-            basketList = basketList.filter(item => item.dishId !== `${dishId}-${portionName}`);
-            if (!basketList.some(obj => obj.dishName === dishName)) {
-              document.querySelector(`[data-id="${dishId}"]`).classList.remove('dishes-card_active');
-            }
-            if (basketList.length === 0) {
-              basketButtonOpen.classList.remove('basket_have');
-              sendOrderButton.disabled = true;
-              sendOrderButton.classList.add('_display_none');
-            }
+          // if (confirm(`${words[lang].deletePortionMessage}`)) {}
+          basketList = basketList.filter(item => item.dishId !== `${dishId}-${portionName}`);
+          if (!basketList.some(obj => obj.dishName === dishName)) {
+            document.querySelector(`[data-id="${dishId}"]`).classList.remove('dishes-card_active');
           }
+          if (basketList.length === 0) {
+            basketButtonOpen.classList.remove('basket_have');
+            sendOrderButton.disabled = true;
+            sendOrderButton.classList.add('_display_none');
+          }
+
         } else {
           basketList = basketList.map(item => item.dishId === `${dishId}-${portionName}` ? { ...item, portionNumber: parseInt(portionNumberSpan.textContent), totalCost: portionCost * parseInt(portionNumberSpan.textContent) } : item);
         }
@@ -333,42 +461,30 @@ export function main(fetchDishesList, words, globalData) {
       totalCost += item.totalCost;
     });
     document.getElementById('totalCost').innerHTML = `${words[lang].totalCost} <span>${totalCost}${globalData.currencySymbol}</span>`;
+    saveDataToLocal();
   }
 
   //Отправка Заказа с сайта
   sendOrderButton.addEventListener('click', sendOrder);
-  function sendOrder() {
+  async function sendOrder() {
     sendOrderButton.disabled = true;
     let orderDishesLit = '';
     let orderTotolCost = '';
-
     if (tableNumber == '') {
-      tableNumber = prompt(`${words[lang].textAskTableNumber}`);
-      if (tableNumber == 'null' || isNaN(tableNumber) || tableNumber == '' || tableNumber === null) {
-        if (tableNumber === null){
-          tableNumber = "";
-          sendOrderButton.disabled = false;
-          return
-        }else{
-          tableNumber = "";
-        sendOrderButton.disabled = false;
-        alert(`${words[lang].textAskTableNumber}`)
-        sendOrder();
-        return
-        }      
-      }
-    }  
-
+      dialogBoxAppears('inpitTableNumber');
+      sendOrderButton.disabled = false;
+      return
+    }
     if (orderId == '') {
       orderId = createOrderId();
     }
     yourOrderButton.innerHTML = `${words[lang].yourOrderButton} ${orderId}`;
     let totalCostMessage = 0;
-    let orderMessage = `${lang}\n${words[globalData.mainLang].tableNumber}${tableNumber}\n\n${words[globalData.mainLang].newOrderMessage}\n${words[lang].orderNumber}\n${orderId}\n`;
+    let orderMessage = `${words[globalData.mainLang].newOrderMessage}\n${words[globalData.mainLang].visitorNnativeLanguage}${lang}\n${words[globalData.mainLang].tableNumber}${tableNumber}\n${words[globalData.mainLang].orderNumber}\n${orderId}\n`;
     let portionNumberMessage = 0;
 
     if (ordersList.length > 0) {
-      orderMessage = `${lang}\n${words[globalData.mainLang].tableNumber}${tableNumber}\n\n${words[globalData.mainLang].updateOrderMessage}\n${words[lang].orderNumber}\n${orderId}\n`;
+      orderMessage = `${words[globalData.mainLang].updateOrderMessage}\n${words[globalData.mainLang].visitorNnativeLanguage}${lang}\n${words[globalData.mainLang].tableNumber}${tableNumber}\n${words[globalData.mainLang].orderNumber}\n${orderId}\n`;
       orderMessage += `\n\n${words[lang].oldDishes}\n`;
       ordersList.forEach(item => {
         portionNumberMessage += 1;
@@ -377,9 +493,9 @@ export function main(fetchDishesList, words, globalData) {
         totalCostMessage += item.totalCost;
       });
       orderMessage += `\n ------------------- \n`;
-      orderMessage += `\n${words[lang].newDishes}\n`;
+      orderMessage += `\n${words[globalData.mainLang].newDishes}\n`;
     } else {
-      orderMessage += `\n${words[lang].listDishes}\n`;
+      orderMessage += `\n${words[globalData.mainLang].listDishes}\n`;
     }
 
     basketList.forEach(item => {
@@ -408,11 +524,11 @@ export function main(fetchDishesList, words, globalData) {
       .then(response => response.json())
       .then(data => {
         if (data.ok) {
-          sendStatisticToForm(lang, tableNumber, 'New', orderDishesLit, orderTotolCost)
-          alert(words[lang].textSendOrder);
+          sendStatisticToForm(lang, tableNumber, 'New', orderDishesLit, orderTotolCost);
+          dialogBoxAppears('info', `${words[lang].textSendOrder}`);
 
         } else {
-          alert(words[lang].textErrorSendOrder);
+          dialogBoxAppears('info', `${words[lang].textErrorSendOrder}`);
         }
       })
     sendOrderButton.disabled = false;
@@ -431,9 +547,10 @@ export function main(fetchDishesList, words, globalData) {
     renderDishesCategoryList(storeData);
     renderDishesList(storeData[0][`${lang}Category`]);
     renderOrderList();
+    saveDataToLocal();
   }
 
-  // Функция для формирования id заказа
+  // Функция для отправки закза в google form заказа
   function sendStatisticToForm(lang, tableNumber, client, orderDishesLit, orderTotolCost) {
     const formSendOrderTable = document.getElementById('sendOrderTable');
 
@@ -444,7 +561,7 @@ export function main(fetchDishesList, words, globalData) {
     document.querySelector('#totolCostOrderTable').value = orderTotolCost;
 
     formSendOrderTable.submit();
-  }
+  };
 
   // Функция для рендеренга заказа
   function renderOrderList() {
@@ -478,8 +595,9 @@ export function main(fetchDishesList, words, globalData) {
       orderListDiv.appendChild(cardItem);
     });
     document.querySelector('#totalCostOrder').innerHTML = `${words[lang].totalCostOrder} <br> <span>${totalCost} ${globalData.currencySymbol}</span>`;
-    mainResetAfterSendOrder()
-  }
+    mainResetAfterSendOrder();
+    saveDataToLocal();
+  };
 
   function mainResetAfterSendOrder() {
     basketButtonOpen.classList.remove('basket_have');
@@ -488,7 +606,7 @@ export function main(fetchDishesList, words, globalData) {
     sendOrderButton.innerText = `${words[lang].updateOrder}`;
     yourOrderButton.classList.add('_active');
     yourOrderButton.classList.remove('_display_none');
-  }
+  };
 
 
 
@@ -507,10 +625,9 @@ export function main(fetchDishesList, words, globalData) {
     const seconds = String(now.getSeconds()).padStart(2, '0'); // Секунды
 
     // Объединяем результат
-    const result = `${day}.${month}.${year} ${hours}:${minutes} - ${tableNumber}`;
-    return result
-
-  }
+    const result = `${day}.${month}.${year} ${hours}:${minutes}:${seconds} - ${tableNumber}`;
+    return result;
+  };
 
 
   //Функция сохранения данных
@@ -528,11 +645,8 @@ export function main(fetchDishesList, words, globalData) {
       userBascketList: basketList,
       userOrderID: orderId,
       datelastVisit: date,
-    }
+    };
     localStorage.setItem('userData', JSON.stringify(userData))
-  }
-  window.addEventListener('beforeunload', () => {
-    saveDataToLocal();
-  }); 
+  };
 }
 
