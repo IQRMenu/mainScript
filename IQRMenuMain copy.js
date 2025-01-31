@@ -101,12 +101,14 @@ export function main(fetchDishesList, words, globalData) {
     const paymentMethod = type === 'cash' ? `${words[globalData.mainLang].cash}` : `${words[globalData.mainLang].bankCard}`;
     const apiUrl = `https://api.telegram.org/bot${globalData.botToken}/sendMessage`;
     let orderListText = '';
+    let orderListTextforGoogle = '';
     let portionNumberMessage = 0;
     let totalCostMessage = 0;
 
     ordersList.forEach(item => {
       portionNumberMessage += 1;
-      orderListText += `\n${portionNumberMessage}. ${item.dishName} - ${item.portionName}x${item.portionNumber} - ${item.totalCost}${globalData.currencySymbol}\n${item.dishNameMainLang}\n`;
+      orderListTextforGoogle += `🔴${portionNumberMessage}. ${item.dishName} - ${item.portionName} x ${item.portionNumber} = ${item.totalCost}${globalData.currencySymbol}    `;
+      orderListText += `\n${portionNumberMessage}. ${item.dishName} - ${item.portionName} x ${item.portionNumber} = ${item.totalCost}${globalData.currencySymbol}\n${item.dishNameMainLang}\n`;
       totalCostMessage += item.totalCost;
     });
     const variables = {
@@ -137,7 +139,9 @@ export function main(fetchDishesList, words, globalData) {
           parse_mode: 'Markdown',
         }),
       });
-
+      // const encodedText = encodeURIComponent(orderListTextforGoogle);
+      const encodedText = encodeURIComponent(orderListTextforGoogle);
+      sendStatisticToForm(orderId, lang, tableNumber, clientType, orderListTextforGoogle, totalCostMessage, type);
       const data = await response.json();
       return data.ok ? 'ok' : 'error';
     } catch (error) {
@@ -225,6 +229,7 @@ export function main(fetchDishesList, words, globalData) {
   let ordersList = [];
   let tableNumber = '';
   let orderId = '';
+  let clientType = '';
 
   fetchDishesList()
     .then(dishesList => {
@@ -237,6 +242,7 @@ export function main(fetchDishesList, words, globalData) {
       const date = `${day}.${month}.${year}`;
 
       if (localStorage.getItem('userData')) {
+        clientType = 'constantly';
         if (JSON.parse(localStorage.getItem('userData')).datelastVisit != date) {
           console.log(date);
 
@@ -264,6 +270,8 @@ export function main(fetchDishesList, words, globalData) {
             sendOrderButton.classList.remove('_display_none');
           }
         }
+      } else {
+        clientType = 'new';
       }
       renderDishesCategoryList(storeData);
 
@@ -496,7 +504,7 @@ export function main(fetchDishesList, words, globalData) {
       ordersList.forEach(item => {
         portionNumberMessage += 1;
         orderDishesLit += `${portionNumberMessage}. ${item.dishName}   `;
-        orderMessage += `\n${portionNumberMessage}. ${item.dishName} - ${item.portionName}x${item.portionNumber} - ${item.totalCost}${globalData.currencySymbol}\n${item.dishNameMainLang}\n`;
+        orderMessage += `\n${portionNumberMessage}. ${item.dishName} - ${item.portionName} x ${item.portionNumber} = ${item.totalCost}${globalData.currencySymbol}\n${item.dishNameMainLang}\n`;
         totalCostMessage += item.totalCost;
       });
       orderMessage += `\n ------------------- \n`;
@@ -508,7 +516,7 @@ export function main(fetchDishesList, words, globalData) {
     basketList.forEach(item => {
       portionNumberMessage += 1;
       orderDishesLit += `${portionNumberMessage}. ${item.dishName}   `;
-      orderMessage += `\n${portionNumberMessage}. ${item.dishName} - ${item.portionName}x${item.portionNumber} - ${item.totalCost}${globalData.currencySymbol}\n${item.dishNameMainLang}\n`;
+      orderMessage += `\n${portionNumberMessage}. ${item.dishName} - ${item.portionName} x ${item.portionNumber} = ${item.totalCost}${globalData.currencySymbol}\n${item.dishNameMainLang}\n`;
       totalCostMessage += item.totalCost;
     });
 
@@ -532,7 +540,6 @@ export function main(fetchDishesList, words, globalData) {
       .then(response => response.json())
       .then(data => {
         if (data.ok) {
-          sendStatisticToForm(lang, tableNumber, 'New', orderDishesLit, orderTotolCost);
           dialogBoxAppears('info', `${words[lang].textSendOrder}`);
 
         } else {
@@ -559,14 +566,15 @@ export function main(fetchDishesList, words, globalData) {
   }
 
   // Функция для отправки закза в google form заказа
-  function sendStatisticToForm(lang, tableNumber, client, orderDishesLit, orderTotolCost) {
+  function sendStatisticToForm(orderId, lang, tableNumber, client, orderDishesLit, orderTotolCost, type) {
     const formSendOrderTable = document.getElementById('sendOrderTable');
-
-    document.querySelector('#langOrderTable').value = lang;
-    document.querySelector('#tableNumberOrderTable').value = tableNumber;
-    document.querySelector('#visitorTypeOrderTable').value = client;
-    document.querySelector('#dishesOrderTable').value = orderDishesLit;
-    document.querySelector('#totolCostOrderTable').value = orderTotolCost;
+    document.querySelector('#inputOrderId').value = orderId;
+    document.querySelector('#inputLangOrderTable').value = lang;
+    document.querySelector('#inputTableNumberOrderTable').value = tableNumber;
+    document.querySelector('#inputVisitorTypeOrderTable').value = client;
+    document.querySelector('#inputDishesOrderTable').value = orderDishesLit;
+    document.querySelector('#inputTotolCostOrderTable').value = orderTotolCost;
+    document.querySelector('#inputType').value = type;
 
     formSendOrderTable.submit();
   };
@@ -655,7 +663,6 @@ export function main(fetchDishesList, words, globalData) {
       datelastVisit: date,
     };
     localStorage.setItem('userData', JSON.stringify(userData))
-  };
-
+  }
 }
 
